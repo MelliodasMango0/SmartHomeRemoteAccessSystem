@@ -1,0 +1,147 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.home import Home
+from models.room import Room
+from models.light import Light
+from models.window_blind import WindowBlind
+from models.lock import Lock
+from models.alarm import Alarm
+from models.user import User
+
+from messaging.csmessage import CSmessage, REQS
+from messaging.cspdu import SmartHomePDU
+
+# ===================
+# SETUP TEST ENVIRONMENT
+# ===================
+user = User("admin", "pass123")
+home = Home("home1", "123 Main St", user)
+
+# Rooms
+living_room = Room("room1", "Living Room", home.home_id)
+bedroom = Room("room2", "Bedroom", home.home_id)
+kitchen = Room("room3", "Kitchen", home.home_id)
+
+# Devices
+light_lr = Light("light_lr", living_room.room_id, home.home_id)
+blind_lr = WindowBlind("blind_lr", living_room.room_id, home.home_id)
+lock_lr = Lock("lock_lr", living_room.room_id, home.home_id, ["1234", "5678"])
+alarm_bd = Alarm("alarm_bd", bedroom.room_id, home.home_id, "4321")
+light_kt = Light("light_kt", kitchen.room_id, home.home_id)
+
+# Add devices
+living_room.devices.extend([light_lr, blind_lr, lock_lr])
+bedroom.devices.append(alarm_bd)
+kitchen.devices.append(light_kt)
+home.rooms.extend([living_room, bedroom, kitchen])
+
+# ===================
+# TEST CASES
+# ===================
+
+def print_status():
+    print("\n===== FINAL DEVICE STATES =====")
+    for room in home.list_rooms():
+        print(f"Room: {room.name}")
+        for device in room.list_devices():
+            print(f" - {device.device_type} ({device.device_id}): {device.get_status()}")
+
+def test_message(message):
+    print("\n--- Test Message ---")
+    print(f"Marshaled: {message.marshal()}")
+    received = CSmessage()
+    received.unmarshal(message.marshal())
+    print(f"Unmarshaled: {received._data}")
+    return received
+
+# Normal case: Turn on kitchen light
+msg1 = CSmessage()
+msg1.setType(REQS.TURN_ON)
+msg1.addValue("device", "light")
+msg1.addValue("room", "Kitchen")
+received = test_message(msg1)
+if received.getValue("room") == "Kitchen":
+    light_kt.turn_on()
+    print(f"[Server Response] Kitchen light status: {light_kt.get_status()}")
+
+# Normal case: Unlock Living Room door with correct PIN
+msg2 = CSmessage()
+msg2.setType(REQS.UNLOCK)
+msg2.addValue("device", "lock")
+msg2.addValue("room", "Living Room")
+msg2.addValue("pin", "1234")
+received = test_message(msg2)
+if lock_lr.unlock(received.getValue("pin")):
+    print(f"[Server Response] Living Room lock: Unlocked")
+else:
+    print(f"[Server Response] Living Room lock: Locked (Invalid PIN)")
+
+# Edge case: Invalid PIN for Living Room lock
+msg3 = CSmessage()
+msg3.setType(REQS.UNLOCK)
+msg3.addValue("device", "lock")
+msg3.addValue("room", "Living Room")
+msg3.addValue("pin", "0000")
+received = test_message(msg3)
+if not lock_lr.unlock(received.getValue("pin")):
+    print(f"[Server Response] Lock status: Locked (Invalid PIN)")
+
+# Edge case: Attempt to disarm Bedroom alarm with wrong PIN
+msg4 = CSmessage()
+msg4.setType(REQS.UNLOCK)
+msg4.addValue("device", "alarm")
+msg4.addValue("room", "Bedroom")
+msg4.addValue("pin", "9999")
+received = test_message(msg4)
+if not alarm_bd.disarm(received.getValue("pin")):
+    print(f"[Server Response] Alarm status: Armed (Invalid PIN)")
+
+# Edge case: Invalid device type
+msg5 = CSmessage()
+msg5.setType(REQS.TURN_ON)
+msg5.addValue("device", "fan")  # Invalid device
+msg5.addValue("room", "Living Room")
+received = test_message(msg5)
+if received.getValue("device") not in ["light", "lock", "alarm", "windowblind"]:
+    print(f"[Server Response] Error: Invalid device type '{received.getValue('device')}'")
+
+# Edge case: Empty message without using reset()
+msg6 = CSmessage()  # No values added, simulating an empty message
+received = test_message(msg6)
+if len(received._data) <= 1:
+    print("[Server Response] Error: Empty message received.")
+
+# Edge case: Malformed message (missing room key)
+msg7 = CSmessage()
+msg7.setType(REQS.TURN_OFF)
+msg7.addValue("device", "light")  # No 'room' key
+received = test_message(msg7)
+if "room" not in received._data:
+    print("[Server Response] Error: Missing 'room' parameter in message.")
+
+# Normal case: Lower Living Room blinds
+msg8 = CSmessage()
+msg8.setType(REQS.TURN_OFF)
+msg8.addValue("device", "windowblind")
+msg8.addValue("room", "Living Room")
+received = test_message(msg8)
+if received.getValue("device") == "windowblind" and received.getValue("room") == "Living Room":
+    blind_lr.lower_blinds()
+    print(f"[Server Response] Blinds in Living Room: {'Up' if blind_lr.is_up else 'Down'}")
+
+#  Normal case: Disarm Bedroom alarm with correct PIN
+msg9 = CSmessage()
+msg9.setType(REQS.UNLOCK)
+msg9.addValue("device", "alarm")
+msg9.addValue("room", "Bedroom")
+msg9.addValue("pin", "4321")
+received = test_message(msg9)
+if alarm_bd.disarm(received.getValue("pin")):
+    print(f"[Server Response] Alarm in Bedroom: Disarmed")
+
+# ===================
+# FINAL DEVICE STATES
+# ===================
+print_status()
