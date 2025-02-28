@@ -1,11 +1,16 @@
 from enum import Enum
 
 class REQS(Enum):
+    LGIN = 100  
+    LOUT = 101  
+    LIST = 102  
+    CHG_STATUS = 103  
     TURN_ON = 200
     TURN_OFF = 201
     LOCK = 202
     UNLOCK = 203
     CHECK_STATUS = 204
+
 
 class CSmessage:
     PJOIN = '&'
@@ -29,13 +34,26 @@ class CSmessage:
         return self._data.get(key)
 
     def marshal(self):
-        pairs = [CSmessage.VJOIN.format(k, v) for (k, v) in self._data.items()]
+        """Convert message to string format for transmission"""
+        pairs = [
+            CSmessage.VJOIN.format(k, v.name if isinstance(v, REQS) else v)
+            for (k, v) in self._data.items()
+        ]
         return CSmessage.PJOIN.join(pairs)
 
     def unmarshal(self, data):
+        """Convert received string data back into a structured message"""
         self._data = {}
         if data:
             params = data.split(CSmessage.PJOIN)
             for p in params:
-                k, v = p.split(CSmessage.VJOIN1)
-                self._data[k] = v
+                k, v = p.split(CSmessage.VJOIN1, 1)
+                if k == "type":
+                    try:
+                        self._data[k] = REQS[v]  # Convert string back to REQS Enum
+                    except KeyError:
+                        self._data[k] = REQS(int(v))  # Try converting integer values
+                else:
+                    self._data[k] = v
+
+
