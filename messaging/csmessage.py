@@ -4,13 +4,16 @@ class REQS(Enum):
     LGIN = 100  
     LOUT = 101  
     LIST = 102  
-    CHG_STATUS = 103  
+    CHG_STATUS = 103
+    SRCH = 104
+    EXIT = 105 
+
     TURN_ON = 200
     TURN_OFF = 201
     LOCK = 202
     UNLOCK = 203
-    CHECK_STATUS = 204
 
+    CHECK_STATUS = 204
 
 class CSmessage:
     PJOIN = '&'
@@ -34,6 +37,7 @@ class CSmessage:
         return self._data.get(key)
 
     def marshal(self):
+
         """Convert message to string format for transmission"""
         pairs = [
             CSmessage.VJOIN.format(k, v.name if isinstance(v, REQS) else v)
@@ -42,18 +46,27 @@ class CSmessage:
         return CSmessage.PJOIN.join(pairs)
 
     def unmarshal(self, data):
-        """Convert received string data back into a structured message"""
+        """
+        Convert received string data back into a structured message.
+        """
         self._data = {}
+
+        print(f"[DEBUG] Unmarshaling message: {data}")  # Debugging
+
         if data:
             params = data.split(CSmessage.PJOIN)
             for p in params:
-                k, v = p.split(CSmessage.VJOIN1, 1)
-                if k == "type":
-                    try:
-                        self._data[k] = REQS[v]  # Convert string back to REQS Enum
-                    except KeyError:
-                        self._data[k] = REQS(int(v))  # Try converting integer values
-                else:
-                    self._data[k] = v
+                try:
+                    k, v = p.split(CSmessage.VJOIN1, 1)
+                    if k == "type":
+                        try:
+                            self._data[k] = REQS[v]  # Convert string back to REQS Enum
+                        except KeyError:
+                            self._data[k] = REQS(int(v))  # Try converting integer values
+                    else:
+                        self._data[k] = v
+                except ValueError:
+                    print(f"[ERROR] Failed to parse parameter: {p}")  # Debugging
+
 
 

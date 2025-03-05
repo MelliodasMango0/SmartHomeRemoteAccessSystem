@@ -7,5 +7,8 @@ class Room:
         self.home_id = home_id
         self.devices = []
 
+    def add_device(self, device: Device):
+        self.devices.append(device)
+
     def list_devices(self):
         return self.devices

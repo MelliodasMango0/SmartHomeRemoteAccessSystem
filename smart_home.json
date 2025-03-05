@@ -1,0 +1,42 @@
+{
+    "users": {
+        "admin": {
+            "password": "1234"
+        },
+        "test_user": {
+            "password": "5678"
+        }
+    },
+    "home": {
+        "home_id": "001",
+        "address": "123 Smart Home Ave",
+        "rooms": {
+            "Living Room": {
+                "room_id": "1",
+                "devices": {
+                    "light1": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
+                    "light2": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
+                    "light3": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
+                    "blind1": { "type": "WindowBlind", "status": "closed" }
+                }
+            },
+            "Kitchen": {
+                "room_id": "2",
+                "devices": {
+                    "light1": { "type": "Light", "status": "off", "brightness": 0, "color": "white" }
+                }
+            },
+            "Bedroom": {
+                "room_id": "3",
+                "devices": {
+                    "light1": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
+                    "light2": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
+                    "blind1": { "type": "WindowBlind", "status": "closed" },
+                    "lock1": { "type": "Lock", "status": "locked", "pin_codes": ["1234", "5678"] },
+                    "lock2": { "type": "Lock", "status": "locked", "pin_codes": ["9876", "4321"] }
+                }
+            }
+        },
+        "alarm": { "status": "disarmed", "pin": "4321" }
+    }
+}
