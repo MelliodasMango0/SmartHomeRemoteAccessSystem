@@ -14,29 +14,87 @@
             "Living Room": {
                 "room_id": "1",
                 "devices": {
-                    "light1": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
-                    "light2": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
-                    "light3": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
-                    "blind1": { "type": "WindowBlind", "status": "closed" }
+                    "light1": {
+                        "type": "Light",
+                        "status": "on",
+                        "brightness": 0,
+                        "color": "red",
+                        "last_updated": "2025-03-05 21:43:20"
+                    },
+                    "light2": {
+                        "type": "Light",
+                        "status": "off",
+                        "brightness": 0,
+                        "color": "white"
+                    },
+                    "light3": {
+                        "type": "Light",
+                        "status": "off",
+                        "brightness": 0,
+                        "color": "white"
+                    },
+                    "blind1": {
+                        "type": "WindowBlind",
+                        "status": "closed"
+                    }
                 }
             },
             "Kitchen": {
                 "room_id": "2",
                 "devices": {
-                    "light1": { "type": "Light", "status": "off", "brightness": 0, "color": "white" }
+                    "light1": {
+                        "type": "Light",
+                        "status": "dimmed",
+                        "brightness": 50,
+                        "color": "blue",
+                        "last_updated": "2025-03-05 22:23:25"
+                    }
                 }
             },
             "Bedroom": {
                 "room_id": "3",
                 "devices": {
-                    "light1": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
-                    "light2": { "type": "Light", "status": "off", "brightness": 0, "color": "white" },
-                    "blind1": { "type": "WindowBlind", "status": "closed" },
-                    "lock1": { "type": "Lock", "status": "locked", "pin_codes": ["1234", "5678"] },
-                    "lock2": { "type": "Lock", "status": "locked", "pin_codes": ["9876", "4321"] }
+                    "light1": {
+                        "type": "Light",
+                        "status": "off",
+                        "brightness": 0,
+                        "color": "white"
+                    },
+                    "light2": {
+                        "type": "Light",
+                        "status": "off",
+                        "brightness": 0,
+                        "color": "white"
+                    },
+                    "blind1": {
+                        "type": "WindowBlind",
+                        "status": "closed",
+                        "last_updated": "2025-03-05 22:30:02"
+                    },
+                    "lock1": {
+                        "type": "Lock",
+                        "status": "locked",
+                        "pin_codes": [
+                            "1234",
+                            "5678"
+                        ],
+                        "last_updated": "2025-03-05 22:29:18"
+                    },
+                    "lock2": {
+                        "type": "Lock",
+                        "status": "locked",
+                        "pin_codes": [
+                            "9876",
+                            "4321"
+                        ],
+                        "last_updated": "2025-03-05 21:30:19"
+                    }
                 }
             }
         },
-        "alarm": { "status": "disarmed", "pin": "4321" }
+        "alarm": {
+            "status": "disarmed",
+            "pin": "4321"
+        }
     }
 }
