@@ -47,8 +47,8 @@ def display_device_info(devices):
                 for key, value in alarm.items():
                     if key == "type":
                         continue  # Already displayed in the device header
-                    elif key == "pin":
-                        print(f"    {key.capitalize()}: [PROTECTED]")
+                    # elif key == "pin":
+                    #     print(f"    {key.capitalize()}: [PROTECTED]")
                     else:
                         # Format the property name for better readability
                         pretty_key = key.replace("_", " ").capitalize()
@@ -69,10 +69,10 @@ def display_device_info(devices):
                 for key, value in device_info.items():
                     if key == "type":
                         continue  # Already displayed in the device header
-                    elif key == "pin_codes" and device_info.get('type') == "Lock":
-                        print(f"    {key.capitalize()}: [PROTECTED]")
-                    elif key == "pin" and device_info.get('type') == "Alarm":
-                        print(f"    {key.capitalize()}: [PROTECTED]")
+                    # elif key == "pin_codes" and device_info.get('type') == "Lock":
+                    #     print(f"    {key.capitalize()}: [PROTECTED]")
+                    # elif key == "pin" and device_info.get('type') == "Alarm":
+                    #     print(f"    {key.capitalize()}: [PROTECTED]")
                     else:
                         # Format the property name for better readability
                         pretty_key = key.replace("_", " ").capitalize()
