@@ -159,8 +159,67 @@ def handle_light(pdu, room, device, current_status=None, current_brightness=None
         if message:
             print(f"Message: {message}")
 
-# This function has been removed as it contained server-side logic
-# and was not being called from anywhere in the client code
+def masked_input(prompt="Password: "):
+    """Get password input with asterisk masking for multiple platforms"""
+    import platform
+    import sys
+    
+    if platform.system() == 'Windows':
+        import msvcrt
+        print(prompt, end='', flush=True)
+        password = ""
+        while True:
+            char = msvcrt.getch()
+            char = char.decode('utf-8') if isinstance(char, bytes) else char
+            
+            if char == '\r' or char == '\n':
+                print()
+                break
+            elif char == '\b' or ord(char) == 8:
+                if password:
+                    password = password[:-1]
+                    print('\b \b', end='', flush=True)
+            elif ord(char) == 3:  # Ctrl+C
+                raise KeyboardInterrupt
+            elif ord(char) >= 32:
+                password += char
+                print('*', end='', flush=True)
+        return password
+    
+    else:  # Unix/Linux/MacOS
+        import termios
+        import tty
+        
+        print(prompt, end='', flush=True)
+        password = ""
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        
+        try:
+            tty.setraw(fd)
+            while True:
+                char = sys.stdin.read(1)
+                
+                if char == '\r' or char == '\n':
+                    sys.stdout.write('\n')
+                    sys.stdout.flush()
+                    break
+                elif char == '\x7f' or ord(char) == 127:  # backspace or delete
+                    if password:
+                        password = password[:-1]
+                        sys.stdout.write('\b \b')
+                        sys.stdout.flush()
+                elif ord(char) == 3:  # ctrl-c
+                    raise KeyboardInterrupt
+                elif ord(char) >= 32:
+                    password += char
+                    sys.stdout.write('*')
+                    sys.stdout.flush()
+                    
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            
+        return password
 
 def main():
     print("\n[SMART HOME APP]")
@@ -189,7 +248,7 @@ def main():
         while session_active:
             # Login sequence
             username = input("Enter username: ")
-            password = getpass.getpass("Enter password: ")
+            password = masked_input("Enter password: ")
             
             login_msg = CSmessage()
             login_msg.setType(REQS.LGIN)

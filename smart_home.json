@@ -14,26 +14,26 @@
             "Living Room": {
                 "room_id": "1",
                 "devices": {
-                    "light1": {
+                    "living_room_light1": {
                         "type": "Light",
                         "status": "on",
                         "brightness": 0,
-                        "color": "red",
-                        "last_updated": "2025-03-05 21:43:20"
+                        "color": "blue",
+                        "last_updated": "2025-03-06 14:15:24"
                     },
-                    "light2": {
+                    "living_room_light2": {
                         "type": "Light",
                         "status": "off",
                         "brightness": 0,
                         "color": "white"
                     },
-                    "light3": {
+                    "living_room_light3": {
                         "type": "Light",
                         "status": "off",
                         "brightness": 0,
                         "color": "white"
                     },
-                    "blind1": {
+                    "living_room_blind1": {
                         "type": "WindowBlind",
                         "status": "closed"
                     }
@@ -42,59 +42,68 @@
             "Kitchen": {
                 "room_id": "2",
                 "devices": {
-                    "light1": {
+                    "kitchen_light1": {
                         "type": "Light",
                         "status": "dimmed",
                         "brightness": 50,
-                        "color": "blue",
-                        "last_updated": "2025-03-05 22:23:25"
+                        "color": "255,0,0",
+                        "last_updated": "2025-03-06 12:57:37"
                     }
                 }
             },
             "Bedroom": {
                 "room_id": "3",
                 "devices": {
-                    "light1": {
+                    "bedroom_light1": {
                         "type": "Light",
                         "status": "off",
                         "brightness": 0,
                         "color": "white"
                     },
-                    "light2": {
+                    "bedroom_light2": {
                         "type": "Light",
                         "status": "off",
                         "brightness": 0,
                         "color": "white"
                     },
-                    "blind1": {
+                    "bedroom_blind1": {
                         "type": "WindowBlind",
-                        "status": "closed",
-                        "last_updated": "2025-03-05 22:30:02"
+                        "status": "down",
+                        "last_updated": "2025-03-05 20:01:37"
                     },
-                    "lock1": {
+                    "bedroom_lock1": {
                         "type": "Lock",
-                        "status": "locked",
+                        "status": "unlocked",
                         "pin_codes": [
                             "1234",
-                            "5678"
+                            "5678",
+                            "4321",
+                            "8765",
+                            "9876"
                         ],
-                        "last_updated": "2025-03-05 22:29:18"
+                        "last_updated": "2025-03-05 20:16:53"
                     },
-                    "lock2": {
+                    "bedroom_lock2": {
                         "type": "Lock",
-                        "status": "locked",
+                        "status": "unlocked",
                         "pin_codes": [
                             "9876",
-                            "4321"
+                            "4321",
+                            "5678",
+                            "1234",
+                            "8765"
                         ],
-                        "last_updated": "2025-03-05 21:30:19"
+                        "last_updated": "2025-03-06 15:06:31"
                     }
                 }
             }
         },
-        "alarm": {
-            "status": "disarmed",
-            "pin": "4321"
+        "special_devices": {
+            "house_alarm": {
+                "type": "Alarm",
+                "status": "disarmed",
+                "pin": "4321"
+            }
         }
     }
 }
