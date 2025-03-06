@@ -34,7 +34,35 @@ def display_device_info(devices):
         print(f"\n=== {room} ===")
         
         if "devices" in room_info:
+            # Check if this is the special "Home" room with house_alarm
+            is_home_with_alarm = (room == "Home" and 
+                                 "house_alarm" in room_info["devices"])
+            
+            # If it's the Home room with house alarm, display it specially
+            if is_home_with_alarm:
+                alarm = room_info["devices"]["house_alarm"]
+                print(f"  • House Alarm ({alarm.get('type', 'Alarm')})")
+                
+                # Display all relevant properties except PIN
+                for key, value in alarm.items():
+                    if key == "type":
+                        continue  # Already displayed in the device header
+                    elif key == "pin":
+                        print(f"    {key.capitalize()}: [PROTECTED]")
+                    else:
+                        # Format the property name for better readability
+                        pretty_key = key.replace("_", " ").capitalize()
+                        print(f"    {pretty_key}: {value}")
+                
+                print()  # Empty line
+                continue  # Skip the regular device display for this room
+            
+            # Regular display for normal rooms
             for device_name, device_info in room_info["devices"].items():
+                # Skip the second display of house_alarm
+                if room == "Home" and device_name == "house_alarm":
+                    continue
+                    
                 print(f"  • {device_name} ({device_info.get('type', 'Unknown')})")
                 
                 # Display all relevant properties
@@ -42,6 +70,8 @@ def display_device_info(devices):
                     if key == "type":
                         continue  # Already displayed in the device header
                     elif key == "pin_codes" and device_info.get('type') == "Lock":
+                        print(f"    {key.capitalize()}: [PROTECTED]")
+                    elif key == "pin" and device_info.get('type') == "Alarm":
                         print(f"    {key.capitalize()}: [PROTECTED]")
                     else:
                         # Format the property name for better readability
@@ -144,6 +174,45 @@ def handle_light(pdu, room, device, current_status=None, current_brightness=None
     else:
         print("Invalid option")
         return
+    
+    print(f"\n[DEBUG] Sending CHG_STATUS request: {msg.marshal()}")
+    pdu.send_message(msg)
+    
+    print("[DEBUG] Waiting for server response...")
+    response = pdu.receive_message()
+    print(f"[DEBUG] Received response: {response.marshal()}")
+    
+    if response:
+        status = response.getValue("status")
+        message = response.getValue("message")
+        print(f"\nResult: {status}")
+        if message:
+            print(f"Message: {message}")
+
+def handle_house_alarm(pdu):
+    """Special handler for house alarm operations"""
+    print("\nHouse Alarm Controls:")
+    print("1. Arm")
+    print("2. Disarm")
+    alarm_option = input("Choose an option: ")
+    
+    status = None
+    if alarm_option == "1":
+        status = "armed"
+    elif alarm_option == "2":
+        status = "disarmed"
+    else:
+        print("Invalid option")
+        return
+    
+    pin = input("Enter PIN: ")
+    
+    # Send the status change request
+    msg = CSmessage()
+    msg.setType(REQS.CHG_STATUS)
+    msg.addValue("device", "house_alarm")
+    msg.addValue("status", status)
+    msg.addValue("pin", pin)
     
     print(f"\n[DEBUG] Sending CHG_STATUS request: {msg.marshal()}")
     pdu.send_message(msg)
@@ -344,12 +413,27 @@ def main():
                                     continue
                                     
                             print("\nAvailable Rooms:")
-                            for i, room in enumerate(devices_data.keys(), 1):
-                                print(f"{i}. {room}")
+                            for i, room in enumerate([r for r in devices_data.keys() if r != "Home"], 1):
+                                print(f"{i}. {room}")   
+                            
+                            # Add after the room display code in choice == "2" section
+                            # First detect if Home with house_alarm exists
+                            if "Home" in devices_data and "devices" in devices_data["Home"] and "house_alarm" in devices_data["Home"]["devices"]:
+                                print("H. House Alarm (special)")  # Add as a special option
                             
                             room_idx = input("\nSelect room number: ")
+                            
+                            # Then add this after room selection in choice == "2" section
+                            # Check if user selected the house alarm
+                            if room_idx.lower() == "h":
+                                print(f"Selected: House Alarm")
+                                handle_house_alarm(pdu)
+                                continue
+                            
                             try:
-                                room_name = list(devices_data.keys())[int(room_idx) - 1]
+                                # Get the list of rooms excluding "Home"
+                                available_rooms = [r for r in devices_data.keys() if r != "Home"]
+                                room_name = available_rooms[int(room_idx) - 1]
                                 print(f"Selected room: {room_name}")
                                 
                                 # Display available devices in the room

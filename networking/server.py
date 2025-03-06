@@ -48,15 +48,24 @@ def get_device_status(room_name=None, device_name=None, group=None):
     result = {}
     
     try:
+        # Special handling for house_alarm
+        house_alarm = data["home"]["special_devices"]["house_alarm"] if "special_devices" in data["home"] and "house_alarm" in data["home"]["special_devices"] else None
+        
         if room_name and device_name:
             # Get specific device in specific room
             if room_name in data["home"]["rooms"] and device_name in data["home"]["rooms"][room_name]["devices"]:
                 result[room_name] = {"devices": {device_name: data["home"]["rooms"][room_name]["devices"][device_name]}}
+            # Special case for house_alarm
+            elif room_name == "Home" and device_name == "house_alarm" and house_alarm:
+                result["Home"] = {"devices": {"house_alarm": house_alarm}}
             
         elif room_name and room_name != "all":
             # Get all devices in specific room
             if room_name in data["home"]["rooms"]:
                 result[room_name] = data["home"]["rooms"][room_name]
+            # Special case for house_alarm
+            elif room_name == "Home" and house_alarm:
+                result["Home"] = {"devices": {"house_alarm": house_alarm}}
                 
         elif group:
             # Get all devices of a specific group/type
@@ -66,6 +75,12 @@ def get_device_status(room_name=None, device_name=None, group=None):
                         if room_name not in result:
                             result[room_name] = {"devices": {}}
                         result[room_name]["devices"][device_name] = device
+            
+            # Include house alarm if group matches
+            if house_alarm and (house_alarm.get("type", "").lower() == group.lower() or group.lower() in house_alarm.get("groups", [])):
+                if "Home" not in result:
+                    result["Home"] = {"devices": {}}
+                result["Home"]["devices"]["house_alarm"] = house_alarm
                         
         elif device_name:
             # Get specific device in any room
@@ -74,10 +89,22 @@ def get_device_status(room_name=None, device_name=None, group=None):
                     if room_name not in result:
                         result[room_name] = {"devices": {}}
                     result[room_name]["devices"][device_name] = room["devices"][device_name]
+            
+            # Include house alarm if name matches
+            if device_name == "house_alarm" and house_alarm:
+                if "Home" not in result:
+                    result["Home"] = {"devices": {}}
+                result["Home"]["devices"]["house_alarm"] = house_alarm
                     
         else:
             # Get all devices in all rooms
             result = data["home"]["rooms"]
+            
+            # Add house_alarm to results
+            if house_alarm:
+                if "Home" not in result:
+                    result["Home"] = {"devices": {}}
+                result["Home"]["devices"]["house_alarm"] = house_alarm
     
     except KeyError as e:
         print(f"[ERROR] KeyError in get_device_status: {e}")
@@ -87,6 +114,47 @@ def get_device_status(room_name=None, device_name=None, group=None):
         return {"error": "An unexpected error occurred"}
         
     return result
+
+def change_house_alarm_status(new_status, pin=None):
+    """Changes the status of the house alarm"""
+    data = load_data()
+    changes_made = []
+    
+    try:
+        if "special_devices" not in data["home"] or "house_alarm" not in data["home"]["special_devices"]:
+            return {"error": "House alarm not found"}
+            
+        alarm_info = data["home"]["special_devices"]["house_alarm"]
+        
+        # Check PIN for the alarm
+        if pin != alarm_info.get("pin"):
+            return {"error": "Invalid PIN code for house alarm"}
+        
+        # Update alarm status
+        if new_status:
+            old_status = alarm_info.get("status", "unknown")
+            data["home"]["special_devices"]["house_alarm"]["status"] = new_status
+            changes_made.append(f"status from {old_status} to {new_status}")
+        
+        # Update last_updated timestamp
+        data["home"]["special_devices"]["house_alarm"]["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Save changes
+        save_data()
+        
+        print(f"[DEBUG] Successfully changed house_alarm: {', '.join(changes_made)}")
+        
+        # Create a detailed success message
+        if changes_made:
+            success_message = f"House alarm updated: {', '.join(changes_made)}"
+        else:
+            success_message = "No changes made to house alarm"
+            
+        return {"success": success_message}
+        
+    except Exception as e:
+        print(f"[ERROR] Unexpected error in change_house_alarm_status: {e}")
+        return {"error": f"An unexpected error occurred: {str(e)}"}
 
 def change_device_status(room, device, new_status, pin=None, brightness=None, color=None):
     data = load_data()
@@ -259,24 +327,41 @@ def handle_client(conn, addr):
                     print("[SERVER] Unauthorized CHG_STATUS attempt")
                     response.addValue("status", "Unauthorized")
                 else:
-                    room = message.getValue("room")
                     device = message.getValue("device")
-                    new_status = message.getValue("status")
-                    pin = message.getValue("pin") if "pin" in message._data else None
-                    brightness = message.getValue("brightness") if "brightness" in message._data else None
-                    color = message.getValue("color") if "color" in message._data else None
-
-                    print(f"[DEBUG] User '{username}' changing {device} in {room} to {new_status}")
-                    print(f"[DEBUG] Additional properties: brightness={brightness}, color={color}, pin={pin}")
                     
-                    result = change_device_status(room, device, new_status, pin, brightness, color)
-
-                    if "success" in result:
-                        response.addValue("status", "Success")
-                        response.addValue("message", result["success"])
+                    # Special handling for house alarm
+                    if device == "house_alarm":
+                        new_status = message.getValue("status")
+                        pin = message.getValue("pin") if "pin" in message._data else None
+                        
+                        print(f"[DEBUG] User '{username}' changing house alarm to {new_status}")
+                        result = change_house_alarm_status(new_status, pin)
+                        
+                        if "success" in result:
+                            response.addValue("status", "Success")
+                            response.addValue("message", result["success"])
+                        else:
+                            response.addValue("status", "Error")
+                            response.addValue("message", result["error"])
                     else:
-                        response.addValue("status", "Error")
-                        response.addValue("message", result["error"])
+                        # Existing logic for other devices
+                        room = message.getValue("room")
+                        new_status = message.getValue("status")
+                        pin = message.getValue("pin") if "pin" in message._data else None
+                        brightness = message.getValue("brightness") if "brightness" in message._data else None
+                        color = message.getValue("color") if "color" in message._data else None
+
+                        print(f"[DEBUG] User '{username}' changing {device} in {room} to {new_status}")
+                        print(f"[DEBUG] Additional properties: brightness={brightness}, color={color}, pin={pin}")
+                        
+                        result = change_device_status(room, device, new_status, pin, brightness, color)
+
+                        if "success" in result:
+                            response.addValue("status", "Success")
+                            response.addValue("message", result["success"])
+                        else:
+                            response.addValue("status", "Error")
+                            response.addValue("message", result["error"])
 
             elif message.getType() == REQS.SRCH:
                 if not logged_in:

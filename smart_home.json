@@ -56,9 +56,10 @@
                 "devices": {
                     "bedroom_light1": {
                         "type": "Light",
-                        "status": "off",
-                        "brightness": 0,
-                        "color": "white"
+                        "status": "dimmed",
+                        "brightness": 50,
+                        "color": "white",
+                        "last_updated": "2025-03-06 16:23:33"
                     },
                     "bedroom_light2": {
                         "type": "Light",
@@ -68,12 +69,12 @@
                     },
                     "bedroom_blind1": {
                         "type": "WindowBlind",
-                        "status": "down",
-                        "last_updated": "2025-03-05 20:01:37"
+                        "status": "open",
+                        "last_updated": "2025-03-06 16:38:05"
                     },
                     "bedroom_lock1": {
                         "type": "Lock",
-                        "status": "unlocked",
+                        "status": "locked",
                         "pin_codes": [
                             "1234",
                             "5678",
@@ -81,7 +82,7 @@
                             "8765",
                             "9876"
                         ],
-                        "last_updated": "2025-03-05 20:16:53"
+                        "last_updated": "2025-03-06 16:36:27"
                     },
                     "bedroom_lock2": {
                         "type": "Lock",
@@ -96,13 +97,24 @@
                         "last_updated": "2025-03-06 15:06:31"
                     }
                 }
+            },
+            "Home": {
+                "devices": {
+                    "house_alarm": {
+                        "type": "Alarm",
+                        "status": "disarmed",
+                        "pin": "4321",
+                        "last_updated": "2025-03-06 16:35:34"
+                    }
+                }
             }
         },
         "special_devices": {
             "house_alarm": {
                 "type": "Alarm",
                 "status": "disarmed",
-                "pin": "4321"
+                "pin": "4321",
+                "last_updated": "2025-03-06 16:35:34"
             }
         }
     }
