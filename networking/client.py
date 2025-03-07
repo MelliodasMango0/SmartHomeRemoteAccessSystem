@@ -13,8 +13,13 @@ from messaging.cspdu import SmartHomePDU as CSpdu
 HOST = "127.0.0.1"
 PORT = 5000
 
-def display_device_info(devices):
+def display_device_info(devices, message=None):
     """Helper function to display device information in a formatted way"""
+
+    if message:
+        print(f"\nError: {message}")
+        return
+    
     if not devices:
         print("No devices found or unauthorized access")
         return
@@ -82,9 +87,31 @@ def display_device_info(devices):
         else:
             print("  No devices found in this room\n")
 
-def handle_window_blind(pdu, room, device):
+def handle_window_blind(pdu, room, device, current_status=None):
     """Special handler for window blind operations"""
+    # Get current status if not provided
+    if current_status is None:
+        msg = CSmessage()
+        msg.setType(REQS.LIST)
+        msg.addValue("room", room)
+        msg.addValue("device", device)
+        msg.addValue("filter_type", "device")
+        
+        print("\n[DEBUG] Getting current window blind status...")
+        pdu.send_message(msg)
+        
+        response = pdu.receive_message()
+        
+        if response and response.getValue("status") == "Success":
+            devices = response.getValue("devices")
+            if isinstance(devices, str):
+                devices = json.loads(devices.replace("'", '"'))
+            
+            if room in devices and "devices" in devices[room] and device in devices[room]["devices"]:
+                current_status = devices[room]["devices"][device].get("status", "unknown")
+    
     print("\nWindow Blind Controls:")
+    print(f"Current status: {current_status}")
     print("1. Raise blind up")
     print("2. Lower blind down")
     print("3. Open blind")
@@ -94,12 +121,24 @@ def handle_window_blind(pdu, room, device):
     status = None
     if blind_option == "1":
         status = "up"
+        if current_status == "up":
+            print(f"\nℹ️ Info: Window blind is already {status}.")
+            return
     elif blind_option == "2":
         status = "down"
+        if current_status == "down":
+            print(f"\nℹ️ Info: Window blind is already {status}.")
+            return
     elif blind_option == "3":
         status = "open"
+        if current_status == "open":
+            print(f"\nℹ️ Info: Window blind is already {status}.")
+            return
     elif blind_option == "4":
         status = "closed"
+        if current_status == "closed":
+            print(f"\nℹ️ Info: Window blind is already {status}.")
+            return
     else:
         print("Invalid option")
         return
@@ -121,9 +160,12 @@ def handle_window_blind(pdu, room, device):
     if response:
         status = response.getValue("status")
         message = response.getValue("message")
-        print(f"\nResult: {status}")
-        if message:
-            print(f"Message: {message}")
+        if status == "Error":
+            print(f"\n❌ Error: {message}")
+        elif status == "Info":
+            print(f"\nℹ️ Info: {message}")
+        else:
+            print(f"\n✓ Success: {message}")
 
 def handle_light(pdu, room, device, current_status=None, current_brightness=None, current_color=None):
     """Special handler for light operations"""
@@ -147,24 +189,54 @@ def handle_light(pdu, room, device, current_status=None, current_brightness=None
     msg.addValue("device", device)
     
     if light_option == "1":
+        # Check if light is already on
+        if current_status == "on":
+            print("\nℹ️ Info: The light is already on.")
+            return
         msg.addValue("status", "on")
     elif light_option == "2":
+        # Check if light is already off
+        if current_status == "off":
+            print("\nℹ️ Info: The light is already off.")
+            return
         msg.addValue("status", "off")
     elif light_option == "3":
         while True:
             try:
                 brightness = int(input("\nEnter brightness level (0-100): "))
                 if 0 <= brightness <= 100:
+                    # Check if brightness is already at the requested level
+                    if brightness == current_brightness and current_status == "dimmed":
+                        print(f"\nℹ️ Info: The light brightness is already set to {brightness}.")
+                        return
                     msg.addValue("status", "dimmed")
                     msg.addValue("brightness", brightness)
                     break
                 else:
-                    print("Brightness must be between 0 and 100")
+                    print("❌ Error: Brightness must be between 0 and 100")
             except ValueError:
-                print("Please enter a valid number")
+                print("❌ Error: Please enter a valid number")
                 continue
     elif light_option == "4":
-        color = input("\nEnter color (e.g., red, blue, white or RGB format 255,0,0): ")
+        # Define valid color options
+        valid_colors = [
+            "white", "red", "green", "blue", "yellow", "purple", 
+            "orange", "pink", "cyan", "magenta", "brown", "black"
+        ]
+        
+        print("\nValid colors: " + ", ".join(valid_colors))
+        color = input("\nEnter color: ").lower().strip()
+        
+        # Validate the color
+        if color not in valid_colors:
+            print(f"❌ Error: '{color}' is not a valid color. Please use one of the listed colors.")
+            return
+            
+        # Check if color is already set to the requested color
+        if color == current_color and current_status != "off":
+            print(f"\nℹ️ Info: The light is already set to {color}.")
+            return
+            
         # Keep the current status unless it was "off"
         if current_status == "off":
             msg.addValue("status", "on")  # Turn on when changing color from off
@@ -172,7 +244,7 @@ def handle_light(pdu, room, device, current_status=None, current_brightness=None
             msg.addValue("status", current_status)  # Keep current status
         msg.addValue("color", color)
     else:
-        print("Invalid option")
+        print("❌ Error: Invalid option")
         return
     
     print(f"\n[DEBUG] Sending CHG_STATUS request: {msg.marshal()}")
@@ -185,22 +257,52 @@ def handle_light(pdu, room, device, current_status=None, current_brightness=None
     if response:
         status = response.getValue("status")
         message = response.getValue("message")
-        print(f"\nResult: {status}")
-        if message:
-            print(f"Message: {message}")
+        
+        if status == "Error":
+            print(f"\n❌ Error: {message}")
+        elif status == "Info":
+            print(f"\nℹ️ Info: {message}")
+        else:
+            print(f"\n✓ Success: {message}")
 
 def handle_house_alarm(pdu):
     """Special handler for house alarm operations"""
+    # First get current status
+    msg = CSmessage()
+    msg.setType(REQS.LIST)
+    msg.addValue("device", "house_alarm")
+    
+    print("\n[DEBUG] Getting current house alarm status...")
+    pdu.send_message(msg)
+    
+    response = pdu.receive_message()
+    
+    current_status = "unknown"
+    if response and response.getValue("status") == "Success":
+        devices = response.getValue("devices")
+        if isinstance(devices, str):
+            devices = json.loads(devices.replace("'", '"'))
+        
+        if "Home" in devices and "devices" in devices["Home"] and "house_alarm" in devices["Home"]["devices"]:
+            current_status = devices["Home"]["devices"]["house_alarm"].get("status", "unknown")
+    
     print("\nHouse Alarm Controls:")
-    print("1. Arm")
+    print(f"Current status: {current_status}")
+    print("\n1. Arm")
     print("2. Disarm")
     alarm_option = input("Choose an option: ")
     
     status = None
     if alarm_option == "1":
         status = "armed"
+        if current_status == "armed":
+            print("\nℹ️ Info: House alarm is already armed.")
+            return
     elif alarm_option == "2":
         status = "disarmed"
+        if current_status == "disarmed":
+            print("\nℹ️ Info: House alarm is already disarmed.")
+            return
     else:
         print("Invalid option")
         return
@@ -224,9 +326,13 @@ def handle_house_alarm(pdu):
     if response:
         status = response.getValue("status")
         message = response.getValue("message")
-        print(f"\nResult: {status}")
-        if message:
-            print(f"Message: {message}")
+        
+        if status == "Error":
+            print(f"\n❌ Error: {message}")
+        elif status == "Info":
+            print(f"\nℹ️ Info: {message}")
+        else:
+            print(f"\n✓ Success: {message}")
 
 def masked_input(prompt="Password: "):
     """Get password input with asterisk masking for multiple platforms"""
@@ -341,7 +447,7 @@ def main():
                     print("╚════════════════════════╝")
                     print("1. Show Device Status")
                     print("2. Change Device Status")
-                    print("3. Add New Device")  # New option
+                    print("3. Add New Device (not implemented)")  
                     print("4. Logout")
                     print("5. Exit")
                     choice = input("Choose an option: ")
@@ -365,7 +471,7 @@ def main():
                             msg.addValue("room", room)
                             msg.addValue("filter_type", "room")
                         elif list_choice == "2":  # By Group
-                            group = input("Enter group name (e.g., lights, security): ").strip()
+                            group = input("Enter group name (Light, Alarm, WindowBlind, Lock): ").strip()
                             msg.addValue("group", group)
                             msg.addValue("filter_type", "group")
                         elif list_choice == "3":  # By Device
@@ -382,13 +488,19 @@ def main():
                         print(f"\n[DEBUG] Sending LIST request: {msg.marshal()}")
                         pdu.send_message(msg)
                         
+                        # Client-side LIST request handler
                         print("[DEBUG] Waiting for server response...")
                         response = pdu.receive_message()
                         print(f"[DEBUG] Received response: {response.marshal()}")
-                        
+
                         if response:
-                            devices = response.getValue("devices")
-                            display_device_info(devices)
+                            status = response.getValue("status")
+                            if status == "Error":
+                                message = response.getValue("message")
+                                print(f"\nError: {message}")
+                            else:
+                                devices = response.getValue("devices")
+                                display_device_info(devices)
                     
                     elif choice == "2":
                         # First, get the room list
@@ -433,6 +545,12 @@ def main():
                             try:
                                 # Get the list of rooms excluding "Home"
                                 available_rooms = [r for r in devices_data.keys() if r != "Home"]
+                                
+                                # Check if the entered room index is valid
+                                if not room_idx.isdigit() or int(room_idx) < 1 or int(room_idx) > len(available_rooms):
+                                    print(f"Invalid room selection: Must be between 1 and {len(available_rooms)}")
+                                    continue
+                                    
                                 room_name = available_rooms[int(room_idx) - 1]
                                 print(f"Selected room: {room_name}")
                                 
@@ -458,7 +576,7 @@ def main():
                                     
                                     # Special handling based on device type
                                     if device_type == "WindowBlind":
-                                        handle_window_blind(pdu, room_name, device_name)
+                                        handle_window_blind(pdu, room_name, device_name, current_status)
                                     elif device_type == "Light":
                                         handle_light(pdu, room_name, device_name, current_status, current_brightness, current_color)
                                     elif device_type == "Lock":

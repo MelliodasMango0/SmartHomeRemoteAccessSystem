@@ -39,6 +39,21 @@ def authenticate_user(username, password):
     data = load_data()
     return username in data["users"] and data["users"][username]["password"] == password
 
+def verify_pin(device_info, pin):
+    """Verifies if the provided PIN matches the one stored in the device"""
+    # Check for alarm-style single PIN
+    if "pin" in device_info:
+        device_pin = device_info.get("pin")
+        return pin is not None and device_pin is not None and pin == device_pin
+        
+    # Check for lock-style PIN array
+    elif "pin_codes" in device_info:
+        pin_codes = device_info.get("pin_codes", [])
+        return pin is not None and pin in pin_codes
+        
+    # No PIN information found
+    return False
+
 # Fetch device status
 def get_device_status(room_name=None, device_name=None, group=None):
     """
@@ -51,6 +66,12 @@ def get_device_status(room_name=None, device_name=None, group=None):
         # Special handling for house_alarm
         house_alarm = data["home"]["special_devices"]["house_alarm"] if "special_devices" in data["home"] and "house_alarm" in data["home"]["special_devices"] else None
         
+        if room_name and room_name != "all":
+            # Check if the requested room exists
+            if room_name not in data["home"]["rooms"] and room_name != "Home":
+                print(f"[ERROR] Room '{room_name}' not found")
+                return {"error": f"Room '{room_name}' not found"}
+        
         if room_name and device_name:
             # Get specific device in specific room
             if room_name in data["home"]["rooms"] and device_name in data["home"]["rooms"][room_name]["devices"]:
@@ -58,43 +79,61 @@ def get_device_status(room_name=None, device_name=None, group=None):
             # Special case for house_alarm
             elif room_name == "Home" and device_name == "house_alarm" and house_alarm:
                 result["Home"] = {"devices": {"house_alarm": house_alarm}}
+            else:
+                return {"error": f"Device '{device_name}' not found in room '{room_name}'"}
             
         elif room_name and room_name != "all":
             # Get all devices in specific room
             if room_name in data["home"]["rooms"]:
                 result[room_name] = data["home"]["rooms"][room_name]
+                if not result[room_name].get("devices"):
+                    return {"error": f"No devices found in room '{room_name}'"}
             # Special case for house_alarm
             elif room_name == "Home" and house_alarm:
                 result["Home"] = {"devices": {"house_alarm": house_alarm}}
+            else:
+                return {"error": f"Room '{room_name}' not found"}
                 
         elif group:
             # Get all devices of a specific group/type
+            found_devices = False
             for room_name, room in data["home"]["rooms"].items():
                 for device_name, device in room["devices"].items():
                     if device.get("type", "").lower() == group.lower() or group.lower() in device.get("groups", []):
                         if room_name not in result:
                             result[room_name] = {"devices": {}}
                         result[room_name]["devices"][device_name] = device
+                        found_devices = True
             
             # Include house alarm if group matches
             if house_alarm and (house_alarm.get("type", "").lower() == group.lower() or group.lower() in house_alarm.get("groups", [])):
                 if "Home" not in result:
                     result["Home"] = {"devices": {}}
                 result["Home"]["devices"]["house_alarm"] = house_alarm
+                found_devices = True
                         
+            if not found_devices:
+                return {"error": f"No devices found in group '{group}'"}
+                
         elif device_name:
             # Get specific device in any room
+            found_device = False
             for room_name, room in data["home"]["rooms"].items():
                 if device_name in room["devices"]:
                     if room_name not in result:
                         result[room_name] = {"devices": {}}
                     result[room_name]["devices"][device_name] = room["devices"][device_name]
+                    found_device = True
             
             # Include house alarm if name matches
             if device_name == "house_alarm" and house_alarm:
                 if "Home" not in result:
                     result["Home"] = {"devices": {}}
                 result["Home"]["devices"]["house_alarm"] = house_alarm
+                found_device = True
+                    
+            if not found_device:
+                return {"error": f"Device '{device_name}' not found"}
                     
         else:
             # Get all devices in all rooms
@@ -105,6 +144,9 @@ def get_device_status(room_name=None, device_name=None, group=None):
                 if "Home" not in result:
                     result["Home"] = {"devices": {}}
                 result["Home"]["devices"]["house_alarm"] = house_alarm
+                
+            if not result:
+                return {"error": "No devices found"}
     
     except KeyError as e:
         print(f"[ERROR] KeyError in get_device_status: {e}")
@@ -118,7 +160,6 @@ def get_device_status(room_name=None, device_name=None, group=None):
 def change_house_alarm_status(new_status, pin=None):
     """Changes the status of the house alarm"""
     data = load_data()
-    changes_made = []
     
     try:
         if "special_devices" not in data["home"] or "house_alarm" not in data["home"]["special_devices"]:
@@ -126,119 +167,100 @@ def change_house_alarm_status(new_status, pin=None):
             
         alarm_info = data["home"]["special_devices"]["house_alarm"]
         
+        # Check if new status is the same as current status
+        current_status = alarm_info.get("status", "unknown")
+        if new_status == current_status:
+            return {"info": f"House alarm is already {new_status}. No change needed."}
+        
         # Check PIN for the alarm
         if pin != alarm_info.get("pin"):
             return {"error": "Invalid PIN code for house alarm"}
         
         # Update alarm status
-        if new_status:
-            old_status = alarm_info.get("status", "unknown")
-            data["home"]["special_devices"]["house_alarm"]["status"] = new_status
-            changes_made.append(f"status from {old_status} to {new_status}")
-        
-        # Update last_updated timestamp
+        data["home"]["special_devices"]["house_alarm"]["status"] = new_status
         data["home"]["special_devices"]["house_alarm"]["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Save changes
         save_data()
         
-        print(f"[DEBUG] Successfully changed house_alarm: {', '.join(changes_made)}")
-        
-        # Create a detailed success message
-        if changes_made:
-            success_message = f"House alarm updated: {', '.join(changes_made)}"
-        else:
-            success_message = "No changes made to house alarm"
-            
-        return {"success": success_message}
+        return {"success": f"House alarm status changed from {current_status} to {new_status}"}
         
     except Exception as e:
         print(f"[ERROR] Unexpected error in change_house_alarm_status: {e}")
         return {"error": f"An unexpected error occurred: {str(e)}"}
 
-def change_device_status(room, device, new_status, pin=None, brightness=None, color=None):
+def change_device_status(room_name, device_name, new_status, pin=None, brightness=None, color=None):
+    """Changes the status of a device in a room"""
     data = load_data()
-    print(f"[DEBUG] Attempting to change {device} in {room} to {new_status}")
-    print(f"[DEBUG] Additional properties: brightness={brightness}, color={color}, pin={pin}")
-    
     changes_made = []
     
     try:
-        # Validate room exists
-        if room not in data["home"]["rooms"]:
-            print(f"[ERROR] Room '{room}' not found")
-            return {"error": f"Room '{room}' not found"}
+        if room_name not in data["home"]["rooms"] or device_name not in data["home"]["rooms"][room_name]["devices"]:
+            return {"error": f"Device '{device_name}' not found in room '{room_name}'"}
             
-        # Validate device exists
-        if device not in data["home"]["rooms"][room]["devices"]:
-            print(f"[ERROR] Device '{device}' not found in room '{room}'")
-            return {"error": f"Device '{device}' not found in room '{room}'"}
-            
-        # Get device info
-        device_info = data["home"]["rooms"][room]["devices"][device]
+        device_info = data["home"]["rooms"][room_name]["devices"][device_name]
+        device_type = device_info.get("type", "Unknown")
         
-        # Check PIN for locks
-        if device_info.get("type") == "Lock":
-            if new_status in ["unlock", "unlocked"] and not pin:
-                return {"error": "PIN required for this lock"}
-            
-            # Check if PIN is valid
+        # For locks, verify PIN
+        if device_type == "Lock":
             pin_codes = device_info.get("pin_codes", [])
-            if pin and pin not in pin_codes:
-                print(f"[ERROR] Invalid PIN provided: {pin}")
-                return {"error": "Invalid PIN code"}
+            if not pin or pin not in pin_codes:
+                return {"error": "Invalid PIN code for lock"}
         
-        # Update device status
-        if new_status:
-            old_status = device_info.get("status", "unknown")
-            data["home"]["rooms"][room]["devices"][device]["status"] = new_status
-            changes_made.append(f"status from {old_status} to {new_status}")
+        # Check for redundant changes
+        current_status = device_info.get("status", "unknown")
+        current_brightness = device_info.get("brightness")
+        current_color = device_info.get("color", "white")
         
-        # Update brightness if provided (for lights)
-        if brightness is not None and device_info.get("type") == "Light":
-            try:
-                brightness_val = int(brightness)
-                if 0 <= brightness_val <= 100:
-                    old_brightness = device_info.get("brightness", 0)
-                    data["home"]["rooms"][room]["devices"][device]["brightness"] = brightness_val
-                    changes_made.append(f"brightness from {old_brightness} to {brightness_val}")
-                    print(f"[DEBUG] Updated brightness to {brightness_val}")
-                else:
-                    print(f"[ERROR] Brightness out of range: {brightness_val}")
-                    return {"error": "Brightness must be between 0-100"}
-            except ValueError:
-                print(f"[ERROR] Invalid brightness value: {brightness}")
-                return {"error": "Invalid brightness value"}
-        
-        # Update color if provided (for lights)
-        if color is not None and device_info.get("type") == "Light":
-            old_color = device_info.get("color", "unknown")
-            data["home"]["rooms"][room]["devices"][device]["color"] = color
-            changes_made.append(f"color from {old_color} to {color}")
-            print(f"[DEBUG] Updated color to {color}")
-        
-        # Update last_updated timestamp
-        data["home"]["rooms"][room]["devices"][device]["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # IMPORTANT: Save the updated data to JSON file
-        save_data()
-        
-        print(f"[DEBUG] Successfully changed {device}: {', '.join(changes_made)}")
-        
-        # Create a detailed success message
-        if changes_made:
-            success_message = f"{device} updated: {', '.join(changes_made)}"
-        else:
-            success_message = f"No changes made to {device}"
+        if (new_status == current_status and 
+            (brightness is None or brightness == current_brightness) and
+            (color is None or color == current_color)):
+            return {"info": "No changes requested - all values match current settings"}
             
-        return {"success": success_message}
+        # Update device status
+        if new_status and new_status != current_status:
+            old_status = current_status
+            data["home"]["rooms"][room_name]["devices"][device_name]["status"] = new_status
+            changes_made.append(f"status from {old_status} to {new_status}")
+            
+        # Update brightness if provided and different
+        if brightness is not None and brightness != current_brightness:
+            old_brightness = current_brightness if current_brightness is not None else 0
+            data["home"]["rooms"][room_name]["devices"][device_name]["brightness"] = brightness
+            changes_made.append(f"brightness from {old_brightness} to {brightness}")
+            
+        # Validate and update color if provided and different
+        if color is not None:
+            valid_colors = [
+                "white", "red", "green", "blue", "yellow", "purple", 
+                "orange", "pink", "cyan", "magenta", "brown", "black"
+            ]
+            if color.lower() not in valid_colors:
+                return {"error": f"Invalid color: '{color}'. Only standard color names are supported."}
+                
+            if color.lower() != current_color.lower():
+                old_color = current_color
+                data["home"]["rooms"][room_name]["devices"][device_name]["color"] = color.lower()
+                changes_made.append(f"color from {old_color} to {color.lower()}")
         
-    except KeyError as e:
-        print(f"[ERROR] KeyError in change_device_status: {e}")
-        return {"error": "Data structure error"}
+        # Update last_updated timestamp if any changes were made
+        if changes_made:
+            data["home"]["rooms"][room_name]["devices"][device_name]["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Save changes
+            save_data()
+            
+            print(f"[DEBUG] Successfully changed {device_name}: {', '.join(changes_made)}")
+            
+            # Create a detailed success message
+            success_message = f"Device updated: {', '.join(changes_made)}"
+            return {"success": success_message}
+        else:
+            return {"info": "No changes needed - all values already match requested settings"}
+        
     except Exception as e:
         print(f"[ERROR] Unexpected error in change_device_status: {e}")
-        return {"error": "An unexpected error occurred"}
+        return {"error": f"An unexpected error occurred: {str(e)}"}
 
 def handle_client(conn, addr):
     """Handles client communication over TCP"""
@@ -319,8 +341,13 @@ def handle_client(conn, addr):
                         print(f"[DEBUG] Processing LIST request for all devices")
                         device_status = get_device_status()
                         
-                    response.addValue("devices", device_status)
-                    response.addValue("status", "Success")
+                    # Check if there was an error
+                    if "error" in device_status:
+                        response.addValue("status", "Error")
+                        response.addValue("message", device_status["error"])
+                    else:
+                        response.addValue("devices", device_status)
+                        response.addValue("status", "Success")
 
             elif message.getType() == REQS.CHG_STATUS:
                 if not logged_in:
@@ -340,6 +367,9 @@ def handle_client(conn, addr):
                         if "success" in result:
                             response.addValue("status", "Success")
                             response.addValue("message", result["success"])
+                        elif "info" in result:
+                            response.addValue("status", "Info")
+                            response.addValue("message", result["info"])
                         else:
                             response.addValue("status", "Error")
                             response.addValue("message", result["error"])
@@ -359,6 +389,9 @@ def handle_client(conn, addr):
                         if "success" in result:
                             response.addValue("status", "Success")
                             response.addValue("message", result["success"])
+                        elif "info" in result:
+                            response.addValue("status", "Info")
+                            response.addValue("message", result["info"])
                         else:
                             response.addValue("status", "Error")
                             response.addValue("message", result["error"])

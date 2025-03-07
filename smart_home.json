@@ -2,13 +2,11 @@
     "users": {
         "admin": {
             "password": "1234"
-        },
-        "test_user": {
-            "password": "5678"
         }
     },
     "home": {
         "home_id": "001",
+        "owner": "admin",
         "address": "123 Smart Home Ave",
         "rooms": {
             "Living Room": {
@@ -16,10 +14,10 @@
                 "devices": {
                     "living_room_light1": {
                         "type": "Light",
-                        "status": "on",
-                        "brightness": 0,
+                        "status": "dimmed",
+                        "brightness": "50",
                         "color": "blue",
-                        "last_updated": "2025-03-06 14:15:24"
+                        "last_updated": "2025-03-06 23:14:20"
                     },
                     "living_room_light2": {
                         "type": "Light",
@@ -44,10 +42,10 @@
                 "devices": {
                     "kitchen_light1": {
                         "type": "Light",
-                        "status": "dimmed",
+                        "status": "off",
                         "brightness": 50,
-                        "color": "255,0,0",
-                        "last_updated": "2025-03-06 12:57:37"
+                        "color": "red",
+                        "last_updated": "2025-03-06 23:11:45"
                     }
                 }
             },
@@ -69,8 +67,8 @@
                     },
                     "bedroom_blind1": {
                         "type": "WindowBlind",
-                        "status": "open",
-                        "last_updated": "2025-03-06 16:38:05"
+                        "status": "up",
+                        "last_updated": "2025-03-06 23:23:08"
                     },
                     "bedroom_lock1": {
                         "type": "Lock",
@@ -94,7 +92,7 @@
                             "1234",
                             "8765"
                         ],
-                        "last_updated": "2025-03-06 15:06:31"
+                        "last_updated": "2025-03-06 22:41:22"
                     }
                 }
             },
@@ -104,7 +102,7 @@
                         "type": "Alarm",
                         "status": "disarmed",
                         "pin": "4321",
-                        "last_updated": "2025-03-06 16:35:34"
+                        "last_updated": "2025-03-06 23:16:46"
                     }
                 }
             }
@@ -114,7 +112,7 @@
                 "type": "Alarm",
                 "status": "disarmed",
                 "pin": "4321",
-                "last_updated": "2025-03-06 16:35:34"
+                "last_updated": "2025-03-06 23:16:46"
             }
         }
     }
